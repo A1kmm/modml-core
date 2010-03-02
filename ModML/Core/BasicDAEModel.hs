@@ -1,5 +1,5 @@
 {-#LANGUAGE NoMonomorphismRestriction,DeriveDataTypeable #-}
-module BasicDAEModel
+module ModML.Core.BasicDAEModel
 where
 
 import Control.Monad.State

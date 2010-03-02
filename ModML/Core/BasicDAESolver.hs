@@ -1,8 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
-module BasicDAESolver
+module ModML.Core.BasicDAESolver
 where
 
-import BasicDAEModel
+import ModML.Core.BasicDAEModel
 import Control.Monad
 import Control.Monad.Error
 import Data.List
@@ -47,7 +47,7 @@ compileCodeGetResults params code =
     withTemporaryDirectory "./" $ \dir ->
       do
         let codegenc = dir </> "codegen.c"
-        let codegenx = "/tmp" </> "codegen"
+        let codegenx = dir </> "codegen"
         writeFile codegenc code
         ret <- rawSystem "gcc" ["-O3", "-I", ".",
                                 "-I", levmarPath,
@@ -84,7 +84,7 @@ makeCodeFor mod =
     let (varCount, varNumMap) = numberVariables (variables mod')
     let (paramNumMap, paramCount) = numberParameters mod'
     return $ (varNumMap,
-              "#include \"SolverHead.h\"\n" ++
+              "#include \"solver-support/SolverHead.h\"\n" ++
               (makeResFn mod' varNumMap) ++
               (makeBoundaryResFn mod' paramNumMap) ++
               (makeTranslateParams varNumMap paramNumMap) ++

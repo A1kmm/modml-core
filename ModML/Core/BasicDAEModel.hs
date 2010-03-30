@@ -2,25 +2,20 @@
 module ModML.Core.BasicDAEModel
 where
 
-import Control.Monad.State
-import Control.Monad.Identity
-import Data.Data
+import qualified Control.Monad.State as S
+import qualified Control.Monad.Identity as I
+import qualified Data.Data as D
+import qualified Data.TypeHash as D
 import qualified Data.Map as M
 
-class (Ord a) => Variable a
-  where
-    variableId :: a -> Int
+newtype RealVariable = RealVariable Int deriving (Eq, Ord, D.Typeable, D.Data)
 
-newtype RealVariable = RealVariable Int deriving (Eq, Ord, Typeable, Data)
-instance Variable RealVariable
-  where
-    variableId (RealVariable a) = a
+variableId (RealVariable a) = a
 instance Show RealVariable
     where
       showsPrec _ v = showString "Variable_" . shows (variableId v)
 
-data RealEquation = RealEquation RealExpression RealExpression deriving (Eq, Ord, Typeable, Data)
-data BoolEquation = BoolEquation BoolExpression BoolExpression deriving (Eq, Ord, Typeable, Data)
+data RealEquation = RealEquation RealExpression RealExpression deriving (Eq, Ord, D.Typeable, D.Data)
 
 data BoolExpression =
     -- A constant true or false.
@@ -35,7 +30,7 @@ data BoolExpression =
     BoolExpression `Or` BoolExpression |
     RealExpression `LessThan` RealExpression |
     RealExpression `Equal` RealExpression
-                   deriving (Eq, Ord, Typeable, Data)
+                   deriving (Eq, Ord, D.Typeable, D.Data)
 
 data RealExpression =
     -- Any real value, as a constant.
@@ -79,23 +74,23 @@ data RealExpression =
     ASinh RealExpression |
     ATanh RealExpression |
     ACosh RealExpression
-          deriving (Eq, Ord, Typeable, Data)
+          deriving (Eq, Ord, D.Typeable, D.Data)
 
 class (Ord a) => CommonSubexpression a
   where
     commonSubexpressionId :: a -> Int
 
-data RealCommonSubexpression = RealCommonSubexpression Int RealExpression deriving (Eq, Ord, Typeable, Data)
+data RealCommonSubexpression = RealCommonSubexpression Int RealExpression deriving (Eq, Ord, D.Typeable, D.Data)
 instance CommonSubexpression RealCommonSubexpression
   where
     commonSubexpressionId (RealCommonSubexpression a _) = a
 
-data BoolCommonSubexpression = BoolCommonSubexpression Int BoolExpression deriving (Eq, Ord, Typeable, Data)
+data BoolCommonSubexpression = BoolCommonSubexpression Int BoolExpression deriving (Eq, Ord, D.Typeable, D.Data)
 instance CommonSubexpression BoolCommonSubexpression
   where
     commonSubexpressionId (BoolCommonSubexpression a _) = a
 
-data AnyCommonSubexpression = FromRealCommonSubexpression RealCommonSubexpression | FromBoolCommonSubexpression BoolCommonSubexpression deriving (Eq, Ord, Typeable, Data)
+data AnyCommonSubexpression = FromRealCommonSubexpression RealCommonSubexpression | FromBoolCommonSubexpression BoolCommonSubexpression deriving (Eq, Ord, D.Typeable, D.Data)
 instance CommonSubexpression AnyCommonSubexpression
   where
     commonSubexpressionId (FromRealCommonSubexpression r) = commonSubexpressionId r
@@ -118,27 +113,31 @@ data BasicDAEModel = BasicDAEModel {
         variables :: [RealVariable],
         commonSubexpressions :: [AnyCommonSubexpression],
         annotations :: M.Map (String, String) String,
+        contextTaggedIDs :: M.Map (D.TypeCode, D.TypeCode) Int,
         nextID :: Int
-    } deriving (Eq, Ord, Typeable, Data)
+    } deriving (Eq, Ord, D.Typeable, D.Data)
 nullModel = BasicDAEModel { equations = [], boundaryEquations = [], interventionRoots = [],
                             forcedInequalities = [], checkedConditions = [], variables = [],
-                            commonSubexpressions = [], annotations = M.empty, nextID = 0
+                            commonSubexpressions = [], annotations = M.empty,
+                            contextTaggedIDs = M.empty, nextID = 0
                           }
 
-type ModelBuilderT m a = StateT BasicDAEModel m a
-type ModelBuilder a = ModelBuilderT Identity a
+type ModelBuilderT m a = S.StateT BasicDAEModel m a
+type ModelBuilder a = ModelBuilderT I.Identity a
 
-buildModelT x = execStateT x nullModel
-buildModel = runIdentity . buildModelT
+buildModelT :: Monad m => ModelBuilderT m a -> m BasicDAEModel
+buildModelT x = S.execStateT x nullModel
+buildModel :: ModelBuilder a -> BasicDAEModel
+buildModel = I.runIdentity . buildModelT
 
-x `newEqM` y = modify (\m -> m { equations = (RealEquation x y):(equations m) })
+x `newEqM` y = S.modify (\m -> m { equations = (RealEquation x y):(equations m) })
 x `newEqX` y = do
   x' <- x
   y' <- y
   x' `newEqM` y'
 newEq = newEqX
 
-newBoundaryEqM c x y = modify (\m -> m { boundaryEquations = (c, (RealEquation x y)):(boundaryEquations m) })
+newBoundaryEqM c x y = S.modify (\m -> m { boundaryEquations = (c, (RealEquation x y)):(boundaryEquations m) })
 newBoundaryEqX c x y = do
   c' <- c
   x' <- x
@@ -146,34 +145,39 @@ newBoundaryEqX c x y = do
   newBoundaryEqM c' x' y'
 newBoundaryEq = newBoundaryEqX
 
-newInterventionRootM x = modify (\m -> m { interventionRoots = x:(interventionRoots m)})
+newInterventionRootM x = S.modify (\m -> m { interventionRoots = x:(interventionRoots m)})
 newInterventionRootX x =
     do
       x' <- x
       newInterventionRootM x'
 newInterventionRoot = newInterventionRootX
 
-newForcedInequalityM x = modify (\m -> m { forcedInequalities = x:(forcedInequalities m)})
+newForcedInequalityM x = S.modify (\m -> m { forcedInequalities = x:(forcedInequalities m)})
 newForcedInequalityX x =
     do
       x' <- x
       newForcedInequalityM x'
 newForcedInequality = newForcedInequalityX
 
-msg `newCheckedConditionM` x = modify (\m -> m { checkedConditions = (msg, x):(checkedConditions m) })
+msg `newCheckedConditionM` x = S.modify (\m -> m { checkedConditions = (msg, x):(checkedConditions m) })
 m `newCheckedConditionX` x = do
   x' <- x
   m `newCheckedConditionM` x'
 newCheckedCondition = newCheckedConditionX
 
 annotateModel :: (Show a, Show b, Show c, Monad m) => a -> b -> c -> ModelBuilderT m ()
-annotateModel s p o = modify (\m -> m { annotations = M.insert ((show s), (show p)) (show o) (annotations m) })
+annotateModel s p o = S.modify (\m -> m { annotations = M.insert ((show s), (show p)) (show o) (annotations m) })
+
+getAnnotation :: (Show a, Show b, Monad m) => a -> b -> ModelBuilderT m (Maybe String)
+getAnnotation s p = do
+  am <- S.gets annotations
+  return $ M.lookup (show s, show p) am
 
 registerCommonSubexpression s =
-    modify (\m -> m { commonSubexpressions = s:(commonSubexpressions m)})
+    S.modify (\m -> m { commonSubexpressions = s:(commonSubexpressions m)})
 
 allocateID :: Monad m => ModelBuilderT m Int
-allocateID = modify (\m -> m { nextID = (+1) $ nextID m}) >> (gets $ flip (-) 1 . nextID)
+allocateID = S.modify (\m -> m { nextID = (+1) $ nextID m}) >> (S.gets $ flip (-) 1 . nextID)
 
 boolConstantM :: Monad m => Bool -> ModelBuilderT m BoolExpression
 boolConstantM = return . BoolConstant
@@ -201,19 +205,19 @@ boolCommonSubexpression me = do
 andM :: Monad m => BoolExpression -> BoolExpression -> ModelBuilderT m BoolExpression
 a `andM` b = return $ a `And` b
 (.&&.) :: Monad m => ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression
-(.&&.) = liftM2 And
+(.&&.) = S.liftM2 And
 andX = (.&&.)
 
 orM :: Monad m => BoolExpression -> BoolExpression -> ModelBuilderT m BoolExpression
 a `orM` b = return $ a `Or` b
 (.||.) :: Monad m => ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression
-(.||.) = liftM2 Or
+(.||.) = S.liftM2 Or
 orX = (.||.)
 
 notM :: Monad m => BoolExpression -> ModelBuilderT m BoolExpression
 notM = return . Not
 notX :: Monad m => ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression
-notX = liftM Not
+notX = S.liftM Not
 
 lessThanM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m BoolExpression
 a `lessThanM` b = return $ a `LessThan` b
@@ -255,22 +259,32 @@ mkNewRealVariable :: Monad m => ModelBuilderT m RealVariable
 mkNewRealVariable = do
   id <- allocateID
   let v = RealVariable id
-  modify (\m -> m { variables = v:(variables m) } )
+  S.modify (\m -> m { variables = v:(variables m) } )
+  return v
+
+mkNewNamedRealVariable name = do
+  v <- mkNewRealVariable
+  annotateModel v "nameIs" name
   return v
 
 mkNewRealVariableM :: Monad m => ModelBuilderT m (ModelBuilderT m RealVariable)
-mkNewRealVariableM = liftM return mkNewRealVariable
+mkNewRealVariableM = S.liftM return mkNewRealVariable
 
 realVariableM :: Monad m => RealVariable -> ModelBuilderT m RealExpression
 realVariableM = return . RealVariableE 
 realVariableX :: Monad m => ModelBuilderT m RealVariable -> ModelBuilderT m RealExpression
-realVariableX = liftM RealVariableE
+realVariableX = S.liftM RealVariableE
 realVariable = realVariableX
 
 newRealVariableE = realVariable (mkNewRealVariable)
+newNamedRealVariableE name = realVariable (mkNewNamedRealVariable name)
 newRealVariable :: Monad m => ModelBuilderT m (ModelBuilderT m RealExpression)
 newRealVariable = do
   v <- newRealVariableE
+  return (return v)
+
+newNamedRealVariable name = do
+  v <- newNamedRealVariableE name
   return (return v)
 
 boundVariableM :: Monad m => ModelBuilderT m RealExpression
@@ -280,7 +294,7 @@ boundVariable = boundVariableM
 
 derivativeM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 derivativeM = return . Derivative
-derivativeX = liftM Derivative
+derivativeX = S.liftM Derivative
 derivative = derivativeX
 
 ifM :: Monad m => BoolExpression -> RealExpression ->
@@ -288,99 +302,99 @@ ifM :: Monad m => BoolExpression -> RealExpression ->
 ifM c {- then -} e1 {- else -} e2 = return $ If c e1 e2
 ifX :: Monad m => ModelBuilderT m BoolExpression -> ModelBuilderT m RealExpression ->
                      ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-ifX = liftM3 If
+ifX = S.liftM3 If
 
 plusM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `plusM` b = return $ a `Plus` b
 (.+.) :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-(.+.) = liftM2 Plus
+(.+.) = S.liftM2 Plus
 plusX = (.+.)
 
 minusM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `minusM` b = return $ a `Minus` b
 (.-.) :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-(.-.) = liftM2 Minus
+(.-.) = S.liftM2 Minus
 minusX = (.-.)
 
 timesM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `timesM` b = return $ a `Times` b
 (.*.) :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-(.*.) = liftM2 Times
+(.*.) = S.liftM2 Times
 timesX = (.*.)
 
 dividedM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `dividedM` b = return $ a `Divided` b
 (./.) :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-(./.) = liftM2 Divided
+(./.) = S.liftM2 Divided
 dividedX = (./.)
 
 powerM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `powerM` b = return $ a `Power` b
 (.**.) :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-(.**.) = liftM2 Power
+(.**.) = S.liftM2 Power
 powerX = (.**.)
 
 logBaseM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `logBaseM` b = return $ a `LogBase` b
 logBaseX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-logBaseX = liftM2 LogBase
+logBaseX = S.liftM2 LogBase
 
 floorM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 floorM = return . Floor
 floorX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-floorX = liftM Floor
+floorX = S.liftM Floor
 ceilingM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 ceilingM = return . Ceiling
 ceilingX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-ceilingX = liftM Floor
+ceilingX = S.liftM Floor
 sinM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 sinM = return . Sin
 sinX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-sinX = liftM Sin
+sinX = S.liftM Sin
 tanM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 tanM = return . Tan
 tanX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-tanX = liftM Tan
+tanX = S.liftM Tan
 cosM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 cosM = return . Cos
 cosX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-cosX = liftM Cos
+cosX = S.liftM Cos
 asinM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 asinM = return . ASin
 asinX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-asinX = liftM ASin
+asinX = S.liftM ASin
 atanM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 atanM = return . ATan
 atanX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-atanX = liftM ATan
+atanX = S.liftM ATan
 acosM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 acosM = return . ACos
 acosX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-acosX = liftM ACos
+acosX = S.liftM ACos
 sinhM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 sinhM = return . Sinh
 sinhX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-sinhX = liftM Sinh
+sinhX = S.liftM Sinh
 tanhM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 tanhM = return . Tanh
 tanhX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-tanhX = liftM Tanh
+tanhX = S.liftM Tanh
 coshM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 coshM = return . Cosh
 coshX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-coshX = liftM Cosh
+coshX = S.liftM Cosh
 asinhM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 asinhM = return . ASinh
 asinhX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-asinhX = liftM ASinh
+asinhX = S.liftM ASinh
 atanhM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 atanhM = return . ATanh
 atanhX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-atanhX = liftM ATanh
+atanhX = S.liftM ATanh
 acoshM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 acoshM = return . ACosh
 acoshX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-acoshX = liftM ACosh
+acoshX = S.liftM ACosh
 
 -- Now define some constants...
 
@@ -454,3 +468,208 @@ initialValueX bv v iv =
     v' <- v
     initialValueM bv v' iv
 initialValue = initialValueX
+
+insertContextTag typetag tag v = S.modify (\m -> m {contextTaggedIDs = M.insert (typetag, tag) v (contextTaggedIDs m)})
+
+getContextTag :: Monad m => D.TypeCode -> D.TypeCode -> ModelBuilderT m (Maybe Int)
+getContextTag typetag tag = do
+  idmap <- S.gets contextTaggedIDs
+  return $ M.lookup (typetag, tag) idmap
+contextTaggedID typetag tag wrap allocm =
+    do
+      t <- getContextTag typetag tag
+      case t
+        of
+          Just id -> return $ wrap id
+          Nothing ->
+            do
+              id <- allocateID
+              allocm id
+              insertContextTag typetag tag id
+              return $ wrap id
+
+data RealCSEContextTag = RealCSEContextTag deriving (D.Typeable, D.Data)
+realCSEContextTag = D.typeCode RealCSEContextTag
+data BoolCSEContextTag = BoolCSEContextTag deriving (D.Typeable, D.Data)
+boolCSEContextTag = D.typeCode BoolCSEContextTag
+data RealVariableContextTag = RealVariableContextTag deriving (D.Typeable, D.Data)
+realVariableContextTag = D.typeCode RealVariableContextTag
+
+contextBoolCommonSubexpressionM :: Monad m => D.TypeCode -> BoolExpression -> ModelBuilderT m BoolExpression
+contextBoolCommonSubexpressionM tag e =
+  contextTaggedID boolCSEContextTag tag (BoolCommonSubexpressionE . flip BoolCommonSubexpression e) $
+    \id ->
+        do
+          let bcs = BoolCommonSubexpression id e
+          registerCommonSubexpression (FromBoolCommonSubexpression bcs)
+contextBoolCommonSubexpressionX tag e =
+    e >>= contextBoolCommonSubexpressionM tag
+contextBoolCommonSubexpression tag me = do
+  ex <- contextBoolCommonSubexpressionX tag me
+  return (return ex)
+
+contextRealCommonSubexpressionM :: Monad m => D.TypeCode -> RealExpression -> ModelBuilderT m RealExpression
+contextRealCommonSubexpressionM tag e =
+  contextTaggedID realCSEContextTag tag (RealCommonSubexpressionE . flip RealCommonSubexpression e) $
+    \id ->
+        do
+          let bcs = RealCommonSubexpression id e
+          registerCommonSubexpression (FromRealCommonSubexpression bcs)
+
+contextRealCommonSubexpressionX tag me = me >>= contextRealCommonSubexpressionM tag
+contextRealCommonSubexpression tag me = do
+  ex <- contextRealCommonSubexpressionX tag me
+  return (return ex)
+
+contextMkNewRealVariable :: Monad m => D.TypeCode -> ModelBuilderT m RealVariable
+contextMkNewRealVariable tag =
+    contextTaggedID realVariableContextTag tag RealVariable $
+      \id -> S.modify (\m -> m { variables = (RealVariable id):(variables m) } )
+contextMkNewRealVariableM :: Monad m => D.TypeCode -> ModelBuilderT m (ModelBuilderT m RealVariable)
+contextMkNewRealVariableM tag = S.liftM return (contextMkNewRealVariable tag)
+
+tryEvaluateRealAsConstant (RealConstant v) = Just v
+tryEvaluateRealAsConstant (RealVariableE _) = Nothing
+tryEvaluateRealAsConstant (BoundVariableE) = Nothing
+tryEvaluateRealAsConstant (Derivative ex) =
+    case (tryEvaluateRealAsConstant ex)
+    of
+      Nothing -> Nothing -- We could do better by numeric differentiation.
+      Just _ -> Just 0
+tryEvaluateRealAsConstant (RealCommonSubexpressionE (RealCommonSubexpression _ ex)) =
+    tryEvaluateRealAsConstant ex
+tryEvaluateRealAsConstant (If be re1 re2) =
+    case tryEvaluateBoolAsConstant be
+    of
+      Nothing -> Nothing
+      Just True ->
+          tryEvaluateRealAsConstant re1
+      _ -> tryEvaluateRealAsConstant re2
+tryEvaluateRealAsConstant (re1 `Plus` re2) =
+    case (tryEvaluateRealAsConstant re1, tryEvaluateRealAsConstant re2)
+    of
+      (Just r1, Just r2) -> Just $ r1 + r2
+      _ -> Nothing
+tryEvaluateRealAsConstant (re1 `Minus` re2) =
+    case (tryEvaluateRealAsConstant re1, tryEvaluateRealAsConstant re2)
+    of
+      (Just r1, Just r2) -> Just $ r1 - r2
+      _ -> Nothing
+tryEvaluateRealAsConstant (re1 `Times` re2) =
+    case (tryEvaluateRealAsConstant re1, tryEvaluateRealAsConstant re2)
+    of
+      (Just r1, Just r2) -> Just $ r1 * r2
+      _ -> Nothing
+tryEvaluateRealAsConstant (re1 `Divided` re2) =
+    case (tryEvaluateRealAsConstant re1, tryEvaluateRealAsConstant re2)
+    of
+      (Just r1, Just r2) -> Just $ r1 / r2
+      _ -> Nothing
+tryEvaluateRealAsConstant (re1 `Power` re2) =
+    case (tryEvaluateRealAsConstant re1, tryEvaluateRealAsConstant re2)
+    of
+      (Just r1, Just r2) -> Just $ r1 ** r2
+      _ -> Nothing
+tryEvaluateRealAsConstant (Floor re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ fromIntegral $ floor r
+      _ -> Nothing
+tryEvaluateRealAsConstant (Ceiling re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ fromIntegral $ ceiling r
+      _ -> Nothing
+tryEvaluateRealAsConstant (LogBase re1 re2) =
+    case (tryEvaluateRealAsConstant re1, tryEvaluateRealAsConstant re2)
+    of
+      (Just r1, Just r2) -> Just $ r1 ** r2
+      _ -> Nothing
+tryEvaluateRealAsConstant(Sin re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ sin r
+      _ -> Nothing
+tryEvaluateRealAsConstant(Tan re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ tan r
+      _ -> Nothing
+tryEvaluateRealAsConstant(Cos re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ cos r
+      _ -> Nothing
+tryEvaluateRealAsConstant(ASin re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ asin r
+      _ -> Nothing
+tryEvaluateRealAsConstant(ATan re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ atan r
+      _ -> Nothing
+tryEvaluateRealAsConstant(ACos re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ acos r
+      _ -> Nothing
+tryEvaluateRealAsConstant(Sinh re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ sinh r
+      _ -> Nothing
+tryEvaluateRealAsConstant(Tanh re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ tanh r
+      _ -> Nothing
+tryEvaluateRealAsConstant(Cosh re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ cosh r
+      _ -> Nothing
+tryEvaluateRealAsConstant(ASinh re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ asinh r
+      _ -> Nothing
+tryEvaluateRealAsConstant(ATanh re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ atanh r
+      _ -> Nothing
+tryEvaluateRealAsConstant(ACosh re) =
+    case (tryEvaluateRealAsConstant re)
+    of
+      Just r -> Just $ acosh r
+      _ -> Nothing
+tryEvaluateBoolAsConstant (BoolConstant b) = Just b
+tryEvaluateBoolAsConstant (BoolCommonSubexpressionE (BoolCommonSubexpression _ ex)) =
+    tryEvaluateBoolAsConstant ex
+tryEvaluateBoolAsConstant (ex1 `And` ex2) =
+    case (tryEvaluateBoolAsConstant ex1, tryEvaluateBoolAsConstant ex2)
+    of
+      (Just b1, Just b2) -> Just $ b1 && b2
+      _ -> Nothing
+tryEvaluateBoolAsConstant (Not ex) =
+    case (tryEvaluateBoolAsConstant ex)
+    of
+      Just b -> Just $ not b
+      _ -> Nothing
+tryEvaluateBoolAsConstant (ex1 `Or` ex2) =
+    case (tryEvaluateBoolAsConstant ex1, tryEvaluateBoolAsConstant ex2)
+    of
+      (Just b1, Just b2) -> Just $ b1 || b2
+      _ -> Nothing
+tryEvaluateBoolAsConstant (ex1 `LessThan` ex2) =
+    case (tryEvaluateRealAsConstant ex1, tryEvaluateRealAsConstant ex2)
+    of
+      (Just r1, Just r2) -> Just $ r1 < r2
+      _ -> Nothing
+tryEvaluateBoolAsConstant (ex1 `Equal` ex2) =
+    case (tryEvaluateRealAsConstant ex1, tryEvaluateRealAsConstant ex2)
+    of
+      (Just r1, Just r2) -> Just $ r1 == r2
+      _ -> Nothing

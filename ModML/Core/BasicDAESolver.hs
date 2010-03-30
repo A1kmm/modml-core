@@ -1,5 +1,14 @@
 {-# LANGUAGE BangPatterns #-}
 module ModML.Core.BasicDAESolver
+    (
+     CodeGenerationError (OtherProblem),
+     AllowCodeGenError,
+     IntegrationResult (FatalError, Warning, CheckedConditionFail, Result, Success),
+     SolverParameters (SolverParameters),
+     defaultSolverParameters,
+     modelToResults,
+     makeCodeFor
+    )
 where
 
 import ModML.Core.BasicDAEModel

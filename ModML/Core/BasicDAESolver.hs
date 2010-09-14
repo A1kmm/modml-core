@@ -24,7 +24,7 @@ import Text.ParserCombinators.Parsec
 import qualified System.IO.Unsafe as S
 import qualified System.Process as S
 import System.FilePath
-import System.Unix.Directory
+import System.Posix.Directory
 import System.Process
 import System.Exit
 

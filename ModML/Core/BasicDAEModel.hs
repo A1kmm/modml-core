@@ -130,6 +130,10 @@ buildModelT x = S.execStateT x nullModel
 buildModel :: ModelBuilder a -> BasicDAEModel
 buildModel = I.runIdentity . buildModelT
 
+evalModelT :: Monad m => ModelBuilderT m a -> m a
+evalModelT x = S.evalStateT x nullModel
+evalModel = I.runIdentity . evalModelT
+
 x `newEqM` y = S.modify (\m -> m { equations = (RealEquation x y):(equations m) })
 x `newEqX` y = do
   x' <- x

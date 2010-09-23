@@ -27,6 +27,9 @@ import System.FilePath
 import System.Posix.Directory
 import System.Process
 import System.Exit
+import Control.Exception
+import System.Random
+import Numeric
 
 data CodeGenerationError = OtherProblem String
 instance Error CodeGenerationError where strMsg s = OtherProblem s
@@ -51,6 +54,12 @@ defaultSolverParameters = SolverParameters 0 1 0.1 10 1 1E-6 1E-6
 otherProjectsPath = "other-projects"
 sundialsPath = otherProjectsPath </> "sundials-2.4.0"
 levmarPath = otherProjectsPath </> "levmar-2.5"
+
+withTemporaryDirectory fp f = do
+  ids <- forM [0..4] $ \_ -> (randomIO :: IO Int)
+  let tmppart = foldl' (\f n -> f . showString "-" . showHex n) id ids "tmp"
+  let fn = fp </> tmppart
+  bracket (createDirectory fn 448 >> return fn) removeDirectory f
 
 compileCodeGetResults params code = 
     withTemporaryDirectory "./" $ \dir ->

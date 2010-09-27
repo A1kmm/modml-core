@@ -1,4 +1,4 @@
-{-#LANGUAGE NoMonomorphismRestriction,DeriveDataTypeable #-}
+{-#LANGUAGE NoMonomorphismRestriction,DeriveDataTypeable,MultiParamTypeClasses,FlexibleInstances,FunctionalDependencies #-}
 module ModML.Core.BasicDAEModel
 where
 
@@ -124,6 +124,13 @@ nullModel = BasicDAEModel { equations = [], boundaryEquations = [], intervention
 
 type ModelBuilderT m a = S.StateT BasicDAEModel m a
 type ModelBuilder a = ModelBuilderT I.Identity a
+
+class BasicModelBuilderAccess m m1 | m -> m1
+    where
+      liftBasicModelBuilder :: m a -> ModelBuilderT m1 a
+instance BasicModelBuilderAccess (S.StateT BasicDAEModel m1) m1
+    where
+      liftBasicModelBuilder = id
 
 buildModelT :: Monad m => ModelBuilderT m a -> m BasicDAEModel
 buildModelT x = S.execStateT x nullModel

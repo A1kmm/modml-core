@@ -4,6 +4,7 @@ where
 
 import qualified Control.Monad.State as S
 import qualified Control.Monad.Identity as I
+import qualified Control.Monad.Trans as M
 import qualified Data.Data as D
 import qualified Data.TypeHash as D
 import qualified Data.Map as M
@@ -122,23 +123,38 @@ nullModel = BasicDAEModel { equations = [], boundaryEquations = [], intervention
                             contextTaggedIDs = M.empty, nextID = 0
                           }
 
-type ModelBuilderT m a = S.StateT BasicDAEModel m a
+newtype ModelBuilderT m a = ModelBuilderT (S.StateT BasicDAEModel m a)
 type ModelBuilder a = ModelBuilderT I.Identity a
+
+modelBuilderTToState (ModelBuilderT a) = a
+
+instance Monad m => Monad (ModelBuilderT m)
+    where
+      (ModelBuilderT a) >>= b = ModelBuilderT $ a >>= (modelBuilderTToState . b)
+      return a = ModelBuilderT (return a)
+      fail a = ModelBuilderT (fail a)
+instance M.MonadTrans ModelBuilderT
+    where
+      lift a = ModelBuilderT $ M.lift a
+instance Monad m => S.MonadState BasicDAEModel (ModelBuilderT m)
+    where
+      get = ModelBuilderT $ S.get
+      put = ModelBuilderT . S.put
 
 class BasicModelBuilderAccess m m1 | m -> m1
     where
       liftBasicModelBuilder :: m a -> ModelBuilderT m1 a
-instance BasicModelBuilderAccess (S.StateT BasicDAEModel m1) m1
+instance BasicModelBuilderAccess (ModelBuilderT m1) m1
     where
       liftBasicModelBuilder = id
 
 buildModelT :: Monad m => ModelBuilderT m a -> m BasicDAEModel
-buildModelT x = S.execStateT x nullModel
+buildModelT x = S.execStateT (modelBuilderTToState x) nullModel
 buildModel :: ModelBuilder a -> BasicDAEModel
 buildModel = I.runIdentity . buildModelT
 
 evalModelT :: Monad m => ModelBuilderT m a -> m a
-evalModelT x = S.evalStateT x nullModel
+evalModelT x = S.evalStateT (modelBuilderTToState x) nullModel
 evalModel = I.runIdentity . evalModelT
 
 x `newEqM` y = S.modify (\m -> m { equations = (RealEquation x y):(equations m) })

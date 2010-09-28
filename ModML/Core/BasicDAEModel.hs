@@ -143,7 +143,7 @@ instance Monad m => S.MonadState BasicDAEModel (ModelBuilderT m)
 
 class BasicModelBuilderAccess m m1 | m -> m1
     where
-      liftBasicModelBuilder :: m a -> ModelBuilderT m1 a
+      liftBasicModelBuilder :: ModelBuilderT m1 a -> m a
 instance BasicModelBuilderAccess (ModelBuilderT m1) m1
     where
       liftBasicModelBuilder = id

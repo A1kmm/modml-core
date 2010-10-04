@@ -13,7 +13,8 @@ description:          A mathematical modelling DSL built on functional transform
 library
   hs-source-dirs:       .
   exposed-modules:
-    ModML.Core.BasicDAEModel
+    ModML.Core.BasicDAEModel,
+    ModML.Core.BasicDAEOpAliases
   build-depends: base ==4.*,
                  containers == 0.3.*,
                  mtl == 1.*,

@@ -231,15 +231,15 @@ boolCommonSubexpression me = do
 
 andM :: Monad m => BoolExpression -> BoolExpression -> ModelBuilderT m BoolExpression
 a `andM` b = return $ a `And` b
-(.&&.) :: Monad m => ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression
-(.&&.) = S.liftM2 And
-andX = (.&&.)
+andX :: Monad m => ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression
+andX = S.liftM2 And
+(.&&.) = andX
 
 orM :: Monad m => BoolExpression -> BoolExpression -> ModelBuilderT m BoolExpression
 a `orM` b = return $ a `Or` b
-(.||.) :: Monad m => ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression
-(.||.) = S.liftM2 Or
-orX = (.||.)
+orX :: Monad m => ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression -> ModelBuilderT m BoolExpression
+orX = S.liftM2 Or
+(.||.) = orX
 
 notM :: Monad m => BoolExpression -> ModelBuilderT m BoolExpression
 notM = return . Not
@@ -254,6 +254,30 @@ a `lessThanX` b = do
   b' <- b
   a' `lessThanM` b'
 (.<.) = lessThanX
+
+lessEqualM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m BoolExpression
+a `lessEqualM` b = do
+  aex <- realCommonSubexpressionM a
+  bex <- realCommonSubexpressionM b
+  (aex `lessThanM` bex) .||. (aex `equalM` bex)
+lessEqualX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m BoolExpression
+a `lessEqualX` b = do
+  a' <- a
+  b' <- b
+  a' `lessEqualM` b'
+(.<=.) = lessEqualX
+
+greaterThanM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m BoolExpression
+a `greaterThanM` b = notX $ a `lessEqualM` b
+greaterThanX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m BoolExpression
+a `greaterThanX` b = notX $ a `lessEqualX` b
+(.>.) = greaterThanX
+
+greaterEqualM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m BoolExpression
+a `greaterEqualM` b = notX $ a `lessThanM` b
+greaterEqualX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m BoolExpression
+a `greaterEqualX` b = notX $ a `lessThanX` b
+(.>=.) = greaterEqualX
 
 equalM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m BoolExpression
 a `equalM` b = return $ a `Equal` b
@@ -333,33 +357,41 @@ ifX = S.liftM3 If
 
 plusM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `plusM` b = return $ a `Plus` b
-(.+.) :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-(.+.) = S.liftM2 Plus
-plusX = (.+.)
+plusX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
+plusX = S.liftM2 Plus
+(.+.) = plusX
 
 minusM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `minusM` b = return $ a `Minus` b
-(.-.) :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-(.-.) = S.liftM2 Minus
-minusX = (.-.)
+minusX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
+minusX = S.liftM2 Minus
+(.-.) = minusX
 
 timesM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `timesM` b = return $ a `Times` b
-(.*.) :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-(.*.) = S.liftM2 Times
-timesX = (.*.)
+timesX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
+timesX = S.liftM2 Times
+(.*.) = timesX
 
 dividedM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `dividedM` b = return $ a `Divided` b
-(./.) :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-(./.) = S.liftM2 Divided
-dividedX = (./.)
+dividedX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
+dividedX = S.liftM2 Divided
+(./.) = dividedX
 
 powerM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `powerM` b = return $ a `Power` b
-(.**.) :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
-(.**.) = S.liftM2 Power
-powerX = (.**.)
+powerX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
+powerX = S.liftM2 Power
+(.**.) = powerX
+
+infixr 2  .||.
+infixr 3  .&&.
+infix  4  .==., .<., .>., .<=., .>=.
+infixl 6 .+., .-.
+infixl 7 .*.
+infixl 7 ./.
+infixl 8 .**.
 
 logBaseM :: Monad m => RealExpression -> RealExpression -> ModelBuilderT m RealExpression
 a `logBaseM` b = return $ a `LogBase` b

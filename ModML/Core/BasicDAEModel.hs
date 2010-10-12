@@ -16,7 +16,7 @@ instance Show RealVariable
     where
       showsPrec _ v = showString "Variable_" . shows (variableId v)
 
-data RealEquation = RealEquation RealExpression RealExpression deriving (Eq, Ord, D.Typeable, D.Data)
+data RealEquation = RealEquation RealExpression RealExpression deriving (Eq, Ord, D.Typeable, D.Data, Show)
 
 data BoolExpression =
     -- A constant true or false.
@@ -31,7 +31,7 @@ data BoolExpression =
     BoolExpression `Or` BoolExpression |
     RealExpression `LessThan` RealExpression |
     RealExpression `Equal` RealExpression
-                   deriving (Eq, Ord, D.Typeable, D.Data)
+                   deriving (Eq, Ord, D.Typeable, D.Data, Show)
 
 data RealExpression =
     -- Any real value, as a constant.
@@ -75,23 +75,23 @@ data RealExpression =
     ASinh RealExpression |
     ATanh RealExpression |
     ACosh RealExpression
-          deriving (Eq, Ord, D.Typeable, D.Data)
+          deriving (Eq, Ord, D.Typeable, D.Data, Show)
 
 class (Ord a) => CommonSubexpression a
   where
     commonSubexpressionId :: a -> Int
 
-data RealCommonSubexpression = RealCommonSubexpression Int RealExpression deriving (Eq, Ord, D.Typeable, D.Data)
+data RealCommonSubexpression = RealCommonSubexpression Int RealExpression deriving (Eq, Ord, D.Typeable, D.Data, Show)
 instance CommonSubexpression RealCommonSubexpression
   where
     commonSubexpressionId (RealCommonSubexpression a _) = a
 
-data BoolCommonSubexpression = BoolCommonSubexpression Int BoolExpression deriving (Eq, Ord, D.Typeable, D.Data)
+data BoolCommonSubexpression = BoolCommonSubexpression Int BoolExpression deriving (Eq, Ord, D.Typeable, D.Data, Show)
 instance CommonSubexpression BoolCommonSubexpression
   where
     commonSubexpressionId (BoolCommonSubexpression a _) = a
 
-data AnyCommonSubexpression = FromRealCommonSubexpression RealCommonSubexpression | FromBoolCommonSubexpression BoolCommonSubexpression deriving (Eq, Ord, D.Typeable, D.Data)
+data AnyCommonSubexpression = FromRealCommonSubexpression RealCommonSubexpression | FromBoolCommonSubexpression BoolCommonSubexpression deriving (Eq, Ord, D.Typeable, D.Data, Show)
 instance CommonSubexpression AnyCommonSubexpression
   where
     commonSubexpressionId (FromRealCommonSubexpression r) = commonSubexpressionId r
@@ -116,7 +116,7 @@ data BasicDAEModel = BasicDAEModel {
         annotations :: M.Map (String, String) String,
         contextTaggedIDs :: M.Map (D.TypeCode, D.TypeCode) Int,
         nextID :: Int
-    } deriving (Eq, Ord, D.Typeable, D.Data)
+    } deriving (Eq, Ord, D.Typeable, D.Data, Show)
 nullModel = BasicDAEModel { equations = [], boundaryEquations = [], interventionRoots = [],
                             forcedInequalities = [], checkedConditions = [], variables = [],
                             commonSubexpressions = [], annotations = M.empty,

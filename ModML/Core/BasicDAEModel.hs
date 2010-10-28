@@ -74,7 +74,8 @@ data RealExpression =
     Cosh RealExpression |
     ASinh RealExpression |
     ATanh RealExpression |
-    ACosh RealExpression
+    ACosh RealExpression |
+    RealExpressionTag String RealExpression
           deriving (Eq, Ord, D.Typeable, D.Data, Show)
 
 class (Ord a) => CommonSubexpression a
@@ -454,6 +455,11 @@ acoshM :: Monad m => RealExpression -> ModelBuilderT m RealExpression
 acoshM = return . ACosh
 acoshX :: Monad m => ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
 acoshX = S.liftM ACosh
+realExpressionTagM :: Monad m => String -> RealExpression -> ModelBuilderT m RealExpression
+realExpressionTagM s = return . RealExpressionTag s
+realExpressionTagX :: Monad m => String -> ModelBuilderT m RealExpression -> ModelBuilderT m RealExpression
+realExpressionTagX s = S.liftM $ RealExpressionTag s
+realExpressionTag = realExpressionTagX
 
 -- Now define some constants...
 
@@ -704,6 +710,9 @@ tryEvaluateRealAsConstant(ACosh re) =
     of
       Just r -> Just $ acosh r
       _ -> Nothing
+tryEvaluateRealAsConstant (RealExpressionTag _ re) =
+    tryEvaluateRealAsConstant re
+
 tryEvaluateBoolAsConstant (BoolConstant b) = Just b
 tryEvaluateBoolAsConstant (BoolCommonSubexpressionE (BoolCommonSubexpression _ ex)) =
     tryEvaluateBoolAsConstant ex

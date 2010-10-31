@@ -24,13 +24,13 @@ data BoolExpression =
     -- A common subexpression tagged expression.
     BoolCommonSubexpressionE BoolCommonSubexpression |
     -- Logical and of two expressions.
-    BoolExpression `And` BoolExpression |
+    And BoolExpression BoolExpression |
     -- Logical not of an expression.
     Not BoolExpression |
     -- Logical or of two expressions.
-    BoolExpression `Or` BoolExpression |
-    RealExpression `LessThan` RealExpression |
-    RealExpression `Equal` RealExpression
+    Or BoolExpression BoolExpression |
+    LessThan RealExpression RealExpression |
+    Equal RealExpression RealExpression
                    deriving (Eq, Ord, D.Typeable, D.Data, Show)
 
 data RealExpression =
@@ -47,15 +47,15 @@ data RealExpression =
     -- If x {- then -} b {- else -} b
     If BoolExpression RealExpression RealExpression |
     -- A sum of two expressions.
-    RealExpression `Plus` RealExpression |
+    Plus RealExpression RealExpression |
     -- First expression minus second expression.
-    RealExpression `Minus` RealExpression |
+    Minus RealExpression RealExpression |
     -- The product of two expressions.
-    RealExpression `Times` RealExpression |
+    Times RealExpression RealExpression |
     -- a `Divided` {- by -} b
-    RealExpression `Divided` RealExpression |
+    Divided RealExpression RealExpression |
     -- a `Power` b - a to the power of b.
-    RealExpression `Power` RealExpression |
+    Power RealExpression RealExpression |
     -- The floor function...
     Floor RealExpression |
     -- The ceiling function...

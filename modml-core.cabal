@@ -16,6 +16,6 @@ library
     ModML.Core.BasicDAEModel,
     ModML.Core.BasicDAEOpAliases
   build-depends: base ==4.*,
-                 containers == 0.3.*,
+                 containers >= 0.3 && < 0.5,
                  mtl >= 1 && < 3,
                  typehash == 1.*
